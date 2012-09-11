@@ -1,74 +1,62 @@
 <?php
 
-	/**
-	 * Elgg avatar access
-	 * 
-	 * @package ElggProfile
-	 * @license http://www.gnu.org/licenses/old-licenses/gpl-2.0.html GNU Public License version 2
-	 * @author Curverider Ltd <info@elgg.com>
-	 * @copyright Curverider Ltd 2008-2009
-	 * @link http://elgg.com/
-	 */
+function profileiconaccess_init()	{
 
-	function avataraccess_init()
-	{
-		register_plugin_hook("action", "profile/iconupload", "avataraccess_action_hook");
-		register_plugin_hook('entity:icon:url', 'user', 'avataraccess_usericon_acl', 1); 
-	}
+  elgg_extend_view('css/elgg', 'css/profileiconaccess');
+  elgg_extend_view('core/avatar/upload', 'forms/profileiconaccess');
+  
+  // register our access save action
+  elgg_register_action('profileiconaccess', elgg_get_plugins_path() . 'profileiconaccess/actions/profileiconaccess.php');
+  
+  // add some custom js
+  $js = elgg_get_simplecache_url('js', 'profileiconaccess/js');
+	elgg_register_simplecache_view('js/profileiconaccess/js');
+	elgg_register_js('profileiconaccess.js', $js);
+  
+	elgg_register_plugin_hook_handler('entity:icon:url', 'user', 'profileiconaccess_usericon_acl'); 
+}
 	
-	function avataraccess_action_hook($hook, $entity_type, $returnvalue, $params)
-	{
-		// Apply access permission here
-		$iconaccess = (int)get_input('iconaccess');
-		$username = get_input('username');
-		
-		$user = get_user_by_username($username);
-		
-		if ($user)
-		{
-			create_metadata($user->guid, 'iconaccess', $iconaccess, 'integer', $user->guid, $iconaccess);	
-		}
-		
-		
-	}
+// takes access input and saves it as metadata on the user
+// this occurs right before the icon save action
+function profileiconaccess_action_hook($hook, $entity_type, $returnvalue, $params) {
+  // Apply access permission here
+	$iconaccess = (int)get_input('iconaccess');
+	$username = get_input('username');
 	
-	function avataraccess_usericon_acl($hook, $entity_type, $returnvalue, $params)
-	{
-		global $CONFIG;
+	$user = get_user_by_username($username);
 		
-		if ( ($hook == 'entity:icon:url') && ($params['entity'] instanceof ElggUser))
-		{
-			$entity = $params['entity'];
-			
-			// Check access
-			
-			// See if we can access the metadata
-			$metadata = get_metadata_byname($entity->guid, 'iconaccess');
-			
-			// If we can access the metadata, that must mean that we can see the picture (as they are saved as the same value)
-			if ($metadata)
-				$hasaccess = true;
-					
-			// Now handle situations where the information is unsaved.	
-			// Private and me
-			if (($access == 0) && ($entity->guid == get_loggedin_userid()))	
-				$hasaccess = true;
-			
-			// Admin can see everything
-			if (isadminloggedin())
-				$hasaccess = true;
-			
-			// If we don't have access then blank profile picture
-			if (!$hasaccess) {
-				$type = $entity->type;
-				$subtype = get_subtype_from_id($entity->subtype);
-				$viewtype = $params['viewtype'];
-				$size = $params['size'];
-				
-				return elgg_view('icon/user/default/'.$size);
-			}
-		}
+	if ($user) {
+    create_metadata($user->guid, 'iconaccess', $iconaccess, 'integer', $user->guid, $iconaccess);	
 	}
+}
+
+
+function profileiconaccess_usericon_acl($hook, $type, $return, $params) {
+		
+  if (elgg_instanceof($params['entity'], 'user')) {
+    $user = $params['entity'];
+    	
+    $options = array(
+        'guid' => $user->guid,
+        'metadata_name' => 'iconaccess',
+        'limit' => 0
+        );
+    
+		// See if we can access the metadata with normal access
+		$metadata = elgg_get_metadata($options);
+    
+    // we may not have the metadata because it may not be set - in which case it's public
+    // so look again with the access ignored and see if we have it then
+    $ignore = elgg_set_ignore_access();
+    $check = elgg_get_metadata($options);
+    elgg_set_ignore_access($ignore);
+    
+    // if we have metadata in $check and not in $metadata, it's because we're not allowed to see it
+    if (!$metadata && $check) {
+      $size = $params['size'];			
+			return "_graphics/icons/user/default{$size}.gif";
+    }
+	}
+}
 	
-	register_elgg_event_handler('init','system','avataraccess_init');
-?>
+elgg_register_event_handler('init','system','profileiconaccess_init');
