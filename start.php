@@ -22,7 +22,7 @@ function init() {
 	elgg_register_simplecache_view('js/profileiconaccess/js');
 	elgg_register_js('profileiconaccess.js', $js);
 
-	elgg_register_plugin_hook_handler('entity:icon:url', 'user', __NAMESPACE__ . '\\usericon_url');
+	elgg_register_plugin_hook_handler('entity:icon:url', 'user', __NAMESPACE__ . '\\usericon_url', 999);
 }
 
 /**
